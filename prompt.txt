@@ -1,0 +1,87 @@
+**Project: Loan Disbursement System**
+
+**1. Backend (Spring Boot)**
+
+*   **Description:** A RESTful API for managing loan applications, including user authentication, loan application submission, and admin review.
+*   **Dependencies:**
+    *   `spring-boot-starter-web`: For building web applications.
+    *   `spring-boot-starter-security`: For authentication and authorization.
+    *   `spring-boot-starter-data-jpa`: For database access.
+    *   `postgresql`: PostgreSQL JDBC driver.
+    *   `jjwt-api`, `jjwt-impl`, `jjwt-jackson`: For JWT creation and validation.
+    *   `springdoc-openapi-starter-webmvc-ui`: For Swagger/OpenAPI documentation.
+*   **Configuration (`application.properties`):**
+    *   `server.port=9000`
+    *   `spring.datasource.url=jdbc:postgresql://localhost:5432/loan_disbursement`
+    *   `spring.datasource.username=postgres`
+    *   `spring.datasource.password=postgres`
+    *   `spring.jpa.hibernate.ddl-auto=create-drop`
+    *   `jwt.secret`: A secure 512-bit key.
+    *   `jwt.expiration=86400000`
+*   **Key Features:**
+    *   **Authentication:** JWT-based authentication with "admin" and "user" roles.
+    *   **Admin User:** A default admin user is created on startup with the username "admin" and password "admin".
+    *   **CORS:** Configured to allow requests from `http://localhost:3000` with credentials.
+    *   **Swagger:** Configured to allow JWT authentication for testing protected endpoints.
+
+**2. Frontend (React)**
+
+*   **Description:** A single-page application for users to apply for loans and for admins to manage applications.
+*   **Dependencies:**
+    *   `axios`: For making HTTP requests to the backend.
+    *   `react-router-dom`: For routing.
+    *   `tailwindcss`: For styling.
+*   **Configuration:**
+    *   An `axios` instance is configured with `baseURL: 'http://localhost:9000'` and `withCredentials: true`.
+*   **Key Features:**
+    *   **User Dashboard:** Allows users to view their loan applications and submit new ones.
+    *   **Admin Dashboard:** Allows admins to view all loan applications, filter them by status, and update their status.
+    *   **Login/Register:** Separate pages for user login and registration.
+
+**3. Database (PostgreSQL)**
+
+*   **Schema (`postgresql_schema.sql`):**
+    *   **`users` table:** Stores user information, including username, password (hashed), email, full name, and role (`USER` or `ADMIN`).
+    *   **`loan_applications` table:** Stores loan application details, including amount, term, purpose, status (`SUBMITTED`, `APPROVED`, `REJECTED`, `DISBURSED`), and foreign key to the `users` table.
+    *   **`disbursements` table:** Stores disbursement information, including a foreign key to the `loan_applications` table and a transaction reference.
+*   **Data Initialization:**
+    *   A `CommandLineRunner` in the backend creates a default admin user on startup.
+
+**Prompt to Recreate the Project:**
+
+"Create a full-stack loan disbursement application with a Spring Boot backend, a React frontend, and a PostgreSQL database.
+
+**Backend:**
+*   Use Spring Boot with Java 17 and Maven.
+*   Implement JWT-based authentication with "admin" and "user" roles.
+*   Create a default admin user on startup with the username "admin" and password "admin".
+*   Implement a REST API with the following endpoints:
+    *   `POST /api/auth/register`: Register a new user.
+    *   `POST /api/auth/login`: Log in a user and return a JWT.
+    *   `GET /api/loans/my-applications`: Get all loan applications for the current user.
+    *   `POST /api/loans/apply`: Submit a new loan application.
+    *   `GET /api/admin/loans`: Get all loan applications (admin only).
+    *   `GET /api/admin/loans/status/{status}`: Get all loan applications with a specific status (admin only).
+    *   `PUT /api/admin/loans/{id}/status`: Update the status of a loan application (admin only).
+    *   `POST /api/admin/loans/{id}/disburse`: Disburse a loan (admin only).
+*   Configure CORS to allow requests from `http://localhost:3000` with credentials.
+*   Configure Swagger to allow JWT authentication.
+
+**Frontend:**
+*   Use React with `create-react-app`.
+*   Use `axios` for API requests, with a base URL of `http://localhost:9000` and `withCredentials: true`.
+*   Use `react-router-dom` for routing.
+*   Use `tailwindcss` for styling.
+*   Create the following components:
+    *   `Login`: A login form.
+    *   `Register`: A registration form.
+    *   `UserDashboard`: A dashboard for users to view their loan applications and submit new ones.
+    *   `AdminDashboard`: A dashboard for admins to view all loan applications, filter them by status, and update their status.
+
+**Database:**
+*   Use PostgreSQL.
+*   Create the following tables:
+    *   `users`: `id`, `username`, `password`, `email`, `full_name`, `role`, `created_at`, `updated_at`.
+    *   `loan_applications`: `id`, `user_id`, `amount`, `term_months`, `purpose`, `bank_account_number`, `ifsc_code`, `status`, `submitted_date`, `approved_date`, `rejected_date`, `rejection_reason`, `disbursed_date`, `transaction_reference`.
+    *   `disbursements`: `id`, `loan_application_id`, `transaction_reference`, `requested_date`, `approved_date`, `disbursed_date`, `disbursed_by_admin`, `remarks`.
+"
