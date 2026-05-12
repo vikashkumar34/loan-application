@@ -49,16 +49,23 @@ public class SecurityConfig {
             .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(jwtAuthenticationEntryPoint))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz
-                // Permit access to Swagger UI
+                // Permit access to Swagger UI and other public endpoints
                 .requestMatchers(
                     "/swagger-ui.html",
                     "/swagger-ui/**",
                     "/v3/api-docs/**",
                     "/h2-console/**",
                     "/api/auth/**",
-                    "/api/admin/**" // Explicitly permit all admin endpoints
+                    "/api/files/**" // Permit all file access
                 ).permitAll()
-                .requestMatchers("/api/loans/**").authenticated()
+                // Secure admin endpoints
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                // Secure user-specific endpoints
+                .requestMatchers(
+                    "/api/loans/**",
+                    "/api/user/**",
+                    "/api/notifications"
+                ).authenticated()
                 .anyRequest().authenticated()
             )
             .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()));

@@ -1,9 +1,10 @@
 package com.loanapp.controller;
 
+import com.loanapp.dto.AdminActionLog;
 import com.loanapp.dto.LoanApplicationResponse;
 import com.loanapp.dto.StatusUpdateRequest;
 import com.loanapp.dto.DisbursementResponse;
-import com.loanapp.dto.ApiResponse;
+import com.loanapp.service.AdminService;
 import com.loanapp.service.LoanService;
 import com.loanapp.service.DisbursementService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,86 +28,41 @@ public class AdminController {
     @Autowired
     private DisbursementService disbursementService;
 
-    /**
-     * Get all loan applications (Admin only)
-     */
+    @Autowired
+    private AdminService adminService;
+
+    @GetMapping("/history")
+    public ResponseEntity<List<AdminActionLog>> getAdminHistory() {
+        List<AdminActionLog> history = adminService.getAdminHistory();
+        return ResponseEntity.ok(history);
+    }
+
     @GetMapping("/loans")
-    public ResponseEntity<ApiResponse> getAllLoanApplications() {
-        try {
-            List<LoanApplicationResponse> applications = loanService.getAllLoanApplications();
-            return ResponseEntity.ok(new ApiResponse(true, "Applications retrieved", applications));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ApiResponse(false, e.getMessage(), null));
-        }
+    public ResponseEntity<List<LoanApplicationResponse>> getAllLoanApplications() {
+        return ResponseEntity.ok(loanService.getAllLoanApplications());
     }
 
-    /**
-     * Filter loan applications by status (Admin only)
-     * Acceptance Criteria: Admin must be able to filter applications by status
-     */
     @GetMapping("/loans/status/{status}")
-    public ResponseEntity<ApiResponse> getLoanApplicationsByStatus(@PathVariable String status) {
-        try {
-            List<LoanApplicationResponse> applications = loanService.getLoanApplicationsByStatus(status);
-            return ResponseEntity.ok(new ApiResponse(true, "Applications retrieved", applications));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ApiResponse(false, e.getMessage(), null));
-        }
+    public ResponseEntity<List<LoanApplicationResponse>> getLoanApplicationsByStatus(@PathVariable String status) throws Exception {
+        return ResponseEntity.ok(loanService.getLoanApplicationsByStatus(status));
     }
 
-    /**
-     * Update loan application status (Admin only)
-     * Can approve or reject applications
-     */
     @PutMapping("/loans/{id}/status")
-    public ResponseEntity<ApiResponse> updateLoanApplicationStatus(
+    public ResponseEntity<LoanApplicationResponse> updateLoanApplicationStatus(
             @PathVariable Long id,
-            @RequestBody StatusUpdateRequest request) {
-        try {
-            LoanApplicationResponse response = loanService.updateLoanApplicationStatus(id, request);
-            return ResponseEntity.ok(new ApiResponse(true, "Status updated successfully", response));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ApiResponse(false, e.getMessage(), null));
-        }
+            @RequestBody StatusUpdateRequest request) throws Exception {
+        return ResponseEntity.ok(loanService.updateLoanApplicationStatus(id, request));
     }
 
-    /**
-     * Disburse amount for an approved loan application (Admin only)
-     * Acceptance Criteria for Disbursement:
-     * - Only user with ADMIN role can access
-     * - Application must be APPROVED
-     * - Generate unique 12-digit transactionReference
-     * - Timestamp disbursementDate
-     * - Audit details (requestedDate and approvedDate)
-     */
     @PostMapping("/loans/{id}/disburse")
-    public ResponseEntity<ApiResponse> disburseAmount(@PathVariable Long id) {
-        try {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            String adminUsername = auth.getName();
-
-            DisbursementResponse response = disbursementService.disburseAmount(id, adminUsername);
-            return ResponseEntity.ok(new ApiResponse(true, "Disbursement processed successfully", response));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ApiResponse(false, e.getMessage(), null));
-        }
+    public ResponseEntity<DisbursementResponse> disburseAmount(@PathVariable Long id) throws Exception {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String adminUsername = auth.getName();
+        return ResponseEntity.ok(disbursementService.disburseAmount(id, adminUsername));
     }
 
-    /**
-     * Get disbursement details for a loan application (Admin only)
-     */
     @GetMapping("/loans/{id}/disbursement")
-    public ResponseEntity<ApiResponse> getDisbursementDetails(@PathVariable Long id) {
-        try {
-            DisbursementResponse response = disbursementService.getDisbursementByLoanId(id);
-            return ResponseEntity.ok(new ApiResponse(true, "Disbursement details retrieved", response));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ApiResponse(false, e.getMessage(), null));
-        }
+    public ResponseEntity<DisbursementResponse> getDisbursementDetails(@PathVariable Long id) throws Exception {
+        return ResponseEntity.ok(disbursementService.getDisbursementByLoanId(id));
     }
 }

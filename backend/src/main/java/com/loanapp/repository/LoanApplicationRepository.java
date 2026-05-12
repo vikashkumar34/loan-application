@@ -17,4 +17,5 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     Optional<LoanApplication> findTopByUserAndStatusInOrderBySubmittedDateDesc(
         User user, List<LoanStatus> statuses);
     List<LoanApplication> findAllByOrderBySubmittedDateDesc();
+    List<LoanApplication> findByUser_Username(String username);
 }
