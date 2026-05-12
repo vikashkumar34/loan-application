@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -36,16 +37,12 @@ public class AuthService {
             throw new Exception("Email already exists");
         }
 
-        User user = new User(
-            null, // id
-            request.getUsername(),
-            passwordEncoder.encode(request.getPassword()),
-            request.getEmail(),
-            request.getFullName(),
-            Role.USER,
-            null, // createdAt (will be set by @PrePersist)
-            null  // updatedAt (will be set by @PrePersist)
-        );
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setEmail(request.getEmail());
+        user.setFullName(request.getFullName());
+        user.setRole(Role.USER);
 
         userRepository.save(user);
 
@@ -68,6 +65,10 @@ public class AuthService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new Exception("Invalid password");
         }
+
+        // Update last login timestamp
+        user.setLastLoginTimestamp(LocalDateTime.now());
+        userRepository.save(user);
 
         // Create JWT token
         String token = jwtTokenProvider.generateToken(
