@@ -28,19 +28,20 @@ public class FileStorageService {
     public String storeFile(MultipartFile file) {
         // Normalize file name
         String originalFileName = StringUtils.cleanPath(file.getOriginalFilename());
-        String fileExtension = "";
-        try {
-            fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
-        } catch (Exception e) {
-            // Handle cases where there is no extension
-        }
-        String fileName = UUID.randomUUID().toString() + fileExtension;
 
         try {
-            // Check if the file's name contains invalid characters
-            if (fileName.contains("..")) {
-                throw new RuntimeException("Sorry! Filename contains invalid path sequence " + fileName);
+            // Check if the file's name contains invalid characters. This is a security check.
+            if (originalFileName.contains("..")) {
+                throw new RuntimeException("Sorry! Filename contains invalid path sequence " + originalFileName);
             }
+
+            String fileExtension = "";
+            try {
+                fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
+            } catch (Exception e) {
+                // Handle cases where there is no extension
+            }
+            String fileName = UUID.randomUUID().toString() + fileExtension;
 
             // Copy file to the target location (Replacing existing file with the same name)
             Path targetLocation = this.fileStorageLocation.resolve(fileName);
@@ -48,7 +49,7 @@ public class FileStorageService {
 
             return fileName;
         } catch (IOException ex) {
-            throw new RuntimeException("Could not store file " + fileName + ". Please try again!", ex);
+            throw new RuntimeException("Could not store file " + originalFileName + ". Please try again!", ex);
         }
     }
 

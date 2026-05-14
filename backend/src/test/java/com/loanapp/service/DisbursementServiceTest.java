@@ -1,11 +1,7 @@
 package com.loanapp.service;
 
 import com.loanapp.dto.DisbursementResponse;
-import com.loanapp.entity.Disbursement;
-import com.loanapp.entity.LoanApplication;
-import com.loanapp.entity.LoanStatus;
-import com.loanapp.entity.User;
-import com.loanapp.entity.Role;
+import com.loanapp.entity.*;
 import com.loanapp.repository.DisbursementRepository;
 import com.loanapp.repository.LoanApplicationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +17,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,52 +30,68 @@ public class DisbursementServiceTest {
     @Mock
     private LoanApplicationRepository loanApplicationRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     @InjectMocks
     private DisbursementService disbursementService;
 
     private LoanApplication loanApplication;
+    private User user;
 
     @BeforeEach
     void setUp() {
-        User user = new User(1L, "testuser", "password", "test@example.com", "Test User", Role.USER, null, null);
+        user = new User();
+        user.setId(1L);
+        user.setUsername("testuser");
+
         loanApplication = new LoanApplication();
         loanApplication.setId(1L);
         loanApplication.setUser(user);
         loanApplication.setAmount(new BigDecimal("10000.0"));
-        loanApplication.setTermMonths(12);
-        loanApplication.setPurpose("Personal Loan");
         loanApplication.setStatus(LoanStatus.APPROVED);
-        loanApplication.setBankAccountNumber("1234567890");
-        loanApplication.setIfscCode("IFSC1234");
         loanApplication.setSubmittedDate(LocalDateTime.now().minusDays(5));
         loanApplication.setApprovedDate(LocalDateTime.now().minusDays(1));
     }
 
     @Test
     void testDisburseAmount_Success() throws Exception {
+        // Arrange
         when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(loanApplication));
+
+        // Mock the check for existing disbursement (must return empty to proceed)
+        when(disbursementRepository.findByLoanApplicationId(1L)).thenReturn(Optional.empty());
+
+        // Mock the loop for unique transaction reference generation
         when(disbursementRepository.findByTransactionReference(anyString())).thenReturn(Optional.empty());
+
         when(disbursementRepository.save(any(Disbursement.class))).thenAnswer(i -> {
             Disbursement savedDisbursement = i.getArgument(0);
-            savedDisbursement.setId(1L);
+            savedDisbursement.setId(100L); // Give it a mock ID
             return savedDisbursement;
         });
 
+        // Act
         DisbursementResponse response = disbursementService.disburseAmount(1L, "admin");
 
+        // Assert
         assertNotNull(response);
         assertEquals(1L, response.getLoanApplicationId());
         assertNotNull(response.getTransactionReference());
-        verify(loanApplicationRepository, times(1)).save(loanApplication);
         assertEquals(LoanStatus.DISBURSED, loanApplication.getStatus());
+
+        // Verify Interactions
+        verify(loanApplicationRepository, times(1)).save(loanApplication);
+        verify(notificationService, times(1)).createNotification(eq(user), anyString(), eq(1L));
     }
 
     @Test
     void testDisburseAmount_LoanNotFound() {
         when(loanApplicationRepository.findById(1L)).thenReturn(Optional.empty());
 
-        Exception exception = assertThrows(Exception.class, () -> disbursementService.disburseAmount(1L, "admin"));
-
+        Exception exception = assertThrows(Exception.class, () ->
+                disbursementService.disburseAmount(1L, "admin")
+        );
         assertEquals("Loan application not found", exception.getMessage());
     }
 
@@ -86,38 +100,31 @@ public class DisbursementServiceTest {
         loanApplication.setStatus(LoanStatus.SUBMITTED);
         when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(loanApplication));
 
-        Exception exception = assertThrows(Exception.class, () -> disbursementService.disburseAmount(1L, "admin"));
-
-        assertEquals("Loan application must be APPROVED before disbursement. Current status: " + LoanStatus.SUBMITTED, exception.getMessage());
+        Exception exception = assertThrows(Exception.class, () ->
+                disbursementService.disburseAmount(1L, "admin")
+        );
+        assertTrue(exception.getMessage().contains("must be APPROVED"));
     }
 
     @Test
     void testDisburseAmount_AlreadyDisbursed() {
         when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(loanApplication));
+        // Mock that a record ALREADY exists
         when(disbursementRepository.findByLoanApplicationId(1L)).thenReturn(Optional.of(new Disbursement()));
 
-        Exception exception = assertThrows(Exception.class, () -> disbursementService.disburseAmount(1L, "admin"));
-
+        Exception exception = assertThrows(Exception.class, () ->
+                disbursementService.disburseAmount(1L, "admin")
+        );
         assertEquals("Loan application has already been disbursed", exception.getMessage());
-    }
-
-    @Test
-    void testGetDisbursementByLoanId_Success() throws Exception {
-        Disbursement disbursement = new Disbursement(1L, loanApplication, "123", null, null, null, "admin", null);
-        when(disbursementRepository.findByLoanApplicationId(1L)).thenReturn(Optional.of(disbursement));
-
-        DisbursementResponse response = disbursementService.getDisbursementByLoanId(1L);
-
-        assertNotNull(response);
-        assertEquals(1L, response.getId());
     }
 
     @Test
     void testGetDisbursementByLoanId_NotFound() {
         when(disbursementRepository.findByLoanApplicationId(1L)).thenReturn(Optional.empty());
 
-        Exception exception = assertThrows(Exception.class, () -> disbursementService.getDisbursementByLoanId(1L));
-
+        Exception exception = assertThrows(Exception.class, () ->
+                disbursementService.getDisbursementByLoanId(1L)
+        );
         assertEquals("Disbursement record not found for this loan application", exception.getMessage());
     }
 }

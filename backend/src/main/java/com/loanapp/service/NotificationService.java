@@ -1,70 +1,57 @@
 package com.loanapp.service;
 
-import com.loanapp.dto.Notification;
-import com.loanapp.entity.LoanApplication;
-import com.loanapp.entity.LoanStatus;
-import com.loanapp.repository.LoanApplicationRepository;
+import com.loanapp.dto.NotificationResponseDto;
+import com.loanapp.entity.Notification;
+import com.loanapp.entity.User;
+import com.loanapp.repository.NotificationRepository;
+import com.loanapp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 @Service
 public class NotificationService {
 
     @Autowired
-    private LoanApplicationRepository loanApplicationRepository;
+    private NotificationRepository notificationRepository;
 
-    private final AtomicLong notificationIdCounter = new AtomicLong();
+    @Autowired
+    private UserRepository userRepository;
 
-    public List<Notification> getNotificationsForUser(String username, String role) {
-        List<Notification> notifications = new ArrayList<>();
-        
-        if ("ADMIN".equals(role)) {
-            List<LoanApplication> submittedApps = loanApplicationRepository.findByStatus(LoanStatus.SUBMITTED);
-            for (LoanApplication app : submittedApps) {
-                notifications.add(new Notification(
-                    notificationIdCounter.incrementAndGet(),
-                    "New loan application #" + app.getId() + " from " + app.getUser().getFullName(),
-                    app.getSubmittedDate(),
-                    false, // Assuming admins haven't read it yet
-                    app.getId()
-                ));
-            }
-        } else {
-            List<LoanApplication> userApps = loanApplicationRepository.findByUser_Username(username);
-            for (LoanApplication app : userApps) {
-                if (app.getStatus() == LoanStatus.APPROVED && app.getApprovedDate() != null) {
-                    notifications.add(new Notification(
-                        notificationIdCounter.incrementAndGet(),
-                        "Your loan application #" + app.getId() + " has been APPROVED.",
-                        app.getApprovedDate(),
-                        false, // This would be tracked per user in a real DB
-                        app.getId()
-                    ));
-                }
-                if (app.getStatus() == LoanStatus.DISBURSED && app.getDisbursedDate() != null) {
-                     notifications.add(new Notification(
-                        notificationIdCounter.incrementAndGet(),
-                        "Your loan application #" + app.getId() + " has been DISBURSED.",
-                        app.getDisbursedDate(),
-                        true, // Let's assume this one was read
-                        app.getId()
-                    ));
-                }
-            }
-        }
-        
-        notifications.sort((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()));
-        return notifications;
+    public void createNotification(User user, String message, Long loanApplicationId) {
+        Notification notification = new Notification(user, message, loanApplicationId);
+        notificationRepository.save(notification);
     }
 
-    public void markAsRead(Long notificationId) {
-        // In a real implementation, this would update a 'read' flag in a database table.
-        // Since the notifications are generated on-the-fly, this method is now a placeholder.
-        System.out.println("Marking notification " + notificationId + " as read (placeholder).");
+    public NotificationResponseDto getNotificationsForUser(Long userId) {
+        List<Notification> notifications = notificationRepository.findByUser_IdOrderByCreatedAtDesc(userId);
+        long unreadCount = notifications.stream().filter(n -> !n.isRead()).count();
+        
+        List<NotificationResponseDto.NotificationDto> dtos = notifications.stream()
+            .map(n -> new NotificationResponseDto.NotificationDto(
+                n.getId(),
+                n.getMessage(),
+                n.getCreatedAt(),
+                n.isRead(),
+                n.getLoanApplicationId()
+            ))
+            .collect(Collectors.toList());
+
+        return new NotificationResponseDto(dtos, unreadCount);
+    }
+
+    public void markAsRead(Long notificationId, Long userId) throws Exception {
+        Notification notification = notificationRepository.findById(notificationId)
+            .orElseThrow(() -> new Exception("Notification not found"));
+
+        // Security check to ensure user can only mark their own notifications as read
+        if (!notification.getUser().getId().equals(userId)) {
+            throw new Exception("Unauthorized to mark this notification as read");
+        }
+
+        notification.setRead(true);
+        notificationRepository.save(notification);
     }
 }

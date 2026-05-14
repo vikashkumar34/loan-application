@@ -42,6 +42,11 @@ public class AdminController {
         return ResponseEntity.ok(loanService.getAllLoanApplications());
     }
 
+    @GetMapping("/loans/{id}")
+    public ResponseEntity<LoanApplicationResponse> getLoanApplication(@PathVariable Long id) throws Exception {
+        return ResponseEntity.ok(loanService.getLoanApplicationById(id));
+    }
+
     @GetMapping("/loans/status/{status}")
     public ResponseEntity<List<LoanApplicationResponse>> getLoanApplicationsByStatus(@PathVariable String status) throws Exception {
         return ResponseEntity.ok(loanService.getLoanApplicationsByStatus(status));

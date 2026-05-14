@@ -7,19 +7,15 @@ export default function LoanDetails() {
   const [loan, setLoan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const role = sessionStorage.getItem('role');
 
   useEffect(() => {
     const fetchLoanDetails = async () => {
       try {
-        const response = await axios.get(`/api/loans/${id}`);
-        if (response.data && response.data.success) {
-          setLoan(response.data.data);
-        } else {
-          // This will be triggered if the API returns success:false
-          setError(response.data.message || `Loan application with ID ${id} not found.`);
-        }
+        const url = role === 'ADMIN' ? `/api/admin/loans/${id}` : `/api/loans/${id}`;
+        const response = await axios.get(url);
+        setLoan(response.data);
       } catch (err) {
-        // This will be triggered for 404s or other network errors
         setError(err.response?.data?.message || `Could not find loan application with ID ${id}.`);
       } finally {
         setLoading(false);
@@ -27,7 +23,7 @@ export default function LoanDetails() {
     };
 
     fetchLoanDetails();
-  }, [id]);
+  }, [id, role]);
 
   if (loading) {
     return (
@@ -42,8 +38,8 @@ export default function LoanDetails() {
       <div className="p-8 bg-white rounded-lg shadow-md max-w-4xl mx-auto text-center">
         <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
         <p className="text-gray-600 mb-6">{error}</p>
-        <Link to="/request-history" className="text-blue-500 hover:underline">
-          Return to Request History
+        <Link to={role === 'ADMIN' ? '/admin/dashboard' : '/request-history'} className="text-blue-500 hover:underline">
+          Return to Dashboard
         </Link>
       </div>
     );

@@ -63,6 +63,36 @@ public class User {
     public User() {
     }
 
+    public User(Long id, String username, String password, String email, String fullName, Role role, LocalDateTime createdAt, LocalDateTime updatedAt, String profileImagePath, KycStatus kycStatus, LocalDateTime lastLoginTimestamp, String parentName, String address, String mobileNumber, String gender, LocalDate dateOfBirth, String bankAccountNumber, String maritalStatus, String nomineeName, String nomineeRelationship, String jobStatus, String religion, String panCard, String aadharNumber) {
+        this.id = id;
+        this.username = username;
+        this.password = password;
+        this.email = email;
+        this.fullName = fullName;
+        this.role = role;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.profileImagePath = profileImagePath;
+        this.kycStatus = kycStatus;
+        this.lastLoginTimestamp = lastLoginTimestamp;
+        this.parentName = parentName;
+        this.address = address;
+        this.mobileNumber = mobileNumber;
+        this.gender = gender;
+        this.dateOfBirth = dateOfBirth;
+        this.bankAccountNumber = bankAccountNumber;
+        this.maritalStatus = maritalStatus;
+        this.nomineeName = nomineeName;
+        this.nomineeRelationship = nomineeRelationship;
+        this.jobStatus = jobStatus;
+        this.religion = religion;
+        this.panCard = panCard;
+        this.aadharNumber = aadharNumber;
+    }
+
+    public User(long l, String testuser, String password, String mail, String testUser, Role role, Object o, Object o1) {
+    }
+
     // Getters and setters for new fields
 
     public String getMaritalStatus() { return maritalStatus; }

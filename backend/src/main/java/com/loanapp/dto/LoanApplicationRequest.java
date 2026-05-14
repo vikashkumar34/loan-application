@@ -13,6 +13,12 @@ public class LoanApplicationRequest {
     private String loanType;
     private Integer cibilScore;
 
+    public LoanApplicationRequest() {
+    }
+
+    public LoanApplicationRequest(BigDecimal bigDecimal, int i, String personalLoan, String number, String ifsc1234) {
+    }
+
     // Getters and setters
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }

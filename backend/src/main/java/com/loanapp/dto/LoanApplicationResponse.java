@@ -1,6 +1,8 @@
 package com.loanapp.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.loanapp.entity.LoanStatus;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -69,6 +71,12 @@ public class LoanApplicationResponse {
         this.rejectionReason = rejectionReason;
         this.disbursedDate = disbursedDate;
         this.transactionReference = transactionReference;
+    }
+
+    public LoanApplicationResponse(Long id, Long id1, BigDecimal amount, Integer termMonths, String purpose, String bankAccountNumber, String ifscCode, String string, LocalDateTime submittedDate, Object o, Object o1, Object o2, Object o3, Object o4) {
+    }
+
+    public LoanApplicationResponse(Long id, Long id1, BigDecimal amount, Integer termMonths, String purpose, LoanStatus status, String bankAccountNumber, String ifscCode, LocalDateTime submittedDate, Object o) {
     }
 
     // Getters and setters

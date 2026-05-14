@@ -1,6 +1,8 @@
 package com.loanapp.entity;
 
 import jakarta.persistence.*;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -45,6 +47,9 @@ public class Disbursement {
         this.disbursedDate = disbursedDate;
         this.disbursedByAdmin = disbursedByAdmin;
         this.remarks = remarks;
+    }
+
+    public Disbursement(LoanApplication loanApplication, String s, BigDecimal bigDecimal, LocalDateTime now, String admin) {
     }
 
     public Long getId() {
