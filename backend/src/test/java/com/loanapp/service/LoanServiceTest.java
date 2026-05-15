@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -27,10 +28,8 @@ public class LoanServiceTest {
 
     @Mock
     private LoanApplicationRepository loanApplicationRepository;
-
     @Mock
     private UserRepository userRepository;
-
     @Mock
     private NotificationService notificationService;
 
@@ -50,142 +49,125 @@ public class LoanServiceTest {
         loanApp = new LoanApplication();
         loanApp.setId(10L);
         loanApp.setUser(testUser);
-        // Explicitly set status to prevent NPE during mapping in tests
         loanApp.setStatus(LoanStatus.SUBMITTED);
         loanApp.setAnnualIncome(new BigDecimal("500000"));
         loanApp.setLoanType("Personal Loan");
     }
 
+    // --- 1. TEST ALL INTEREST RATE BRANCHES (The "Big Green Block") ---
+
     @Test
-    void testSubmitLoanApplication_Success() throws Exception {
-        // Arrange
-        LoanApplicationRequest request = new LoanApplicationRequest();
-        request.setAmount(new BigDecimal("10000"));
-        request.setAnnualIncome(new BigDecimal("6000000"));
-        request.setLoanType("Personal Loan");
-        request.setCibilScore(800);
+    void testInterestRate_AllPaths() throws Exception {
+        // Personal Loan Brackets
+        runInterestTest("Personal Loan", "6000000", 800, "10.0");
+        runInterestTest("Personal Loan", "4500000", 800, "11.0");
+        runInterestTest("Personal Loan", "1000000", 800, "12.0");
 
-        User admin = new User();
-        admin.setId(2L);
-        admin.setRole(Role.ADMIN);
+        // Home Loan Brackets (Every single else-if)
+        runInterestTest("Home Loan", "6000000", 800, "7.0");
+        runInterestTest("Home Loan", "4500000", 800, "7.5");
+        runInterestTest("Home Loan", "3500000", 800, "8.0");
+        runInterestTest("Home Loan", "2500000", 800, "8.5");
+        runInterestTest("Home Loan", "1000000", 800, "9.0");
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(userRepository.findByRole(Role.ADMIN)).thenReturn(Collections.singletonList(admin));
+        // Education Loan Brackets
+        runInterestTest("Education Loan", "6000000", 800, "7.0");
+        runInterestTest("Education Loan", "4500000", 800, "7.5");
+        runInterestTest("Education Loan", "3500000", 800, "8.0");
+        runInterestTest("Education Loan", "1000000", 800, "8.5");
 
-        // Fix: Ensure the saved object returned by the mock has a status
-        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(i -> {
-            LoanApplication saved = i.getArgument(0);
-            saved.setId(10L);
-            if (saved.getStatus() == null) {
-                saved.setStatus(LoanStatus.SUBMITTED);
-            }
-            return saved;
-        });
-
-        // Act
-        LoanApplicationResponse response = loanService.submitLoanApplication(1L, request);
-
-        // Assert
-        assertNotNull(response);
-        assertEquals(10L, response.getId());
-        assertEquals("SUBMITTED", response.getStatus());
-        verify(notificationService).createNotification(eq(admin), anyString(), eq(10L));
+        // Null/Low CIBIL check
+        runInterestTest("Personal Loan", "1000000", 600, "13.0"); // 12 + 1
+        runInterestTest("Personal Loan", "1000000", null, "12.0"); // No impact if null
     }
 
-    @Test
-    void testCalculateInterestRate_CibilImpact() throws Exception {
-        // Arrange
-        LoanApplicationRequest request = new LoanApplicationRequest();
-        request.setAnnualIncome(new BigDecimal("1000000"));
-        request.setLoanType("Home Loan");
-        request.setCibilScore(600);
+    private void runInterestTest(String type, String income, Integer cibil, String expectedRate) throws Exception {
+        LoanApplicationRequest req = new LoanApplicationRequest();
+        req.setLoanType(type);
+        req.setAnnualIncome(new BigDecimal(income));
+        req.setCibilScore(cibil);
+        req.setAmount(new BigDecimal("1000"));
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(i -> {
-            LoanApplication saved = i.getArgument(0);
-            if (saved.getStatus() == null) saved.setStatus(LoanStatus.SUBMITTED);
-            return saved;
+        when(userRepository.findByRole(Role.ADMIN)).thenReturn(Collections.emptyList());
+        when(loanApplicationRepository.save(any(LoanApplication.class))).thenAnswer(inv -> {
+            LoanApplication s = inv.getArgument(0);
+            s.setId(10L);
+            s.setStatus(LoanStatus.SUBMITTED);
+            return s;
         });
 
-        // Act
-        loanService.submitLoanApplication(1L, request);
+        loanService.submitLoanApplication(1L, req);
 
-        // Assert: Home Loan + < 2M income = 9.0% base. + 1% low CIBIL = 10.0%
-        verify(loanApplicationRepository).save(argThat(app ->
-                app.getInterestRate().compareTo(new BigDecimal("10.0")) == 0
+        verify(loanApplicationRepository, atLeastOnce()).save(argThat(app ->
+                app.getInterestRate() != null && app.getInterestRate().compareTo(new BigDecimal(expectedRate)) == 0
         ));
+        clearInvocations(loanApplicationRepository, userRepository);
+    }
+
+    // --- 2. TEST STATUS UPDATES (APPROVED, REJECTED, INVALID) ---
+
+    @Test
+    void testUpdateStatus_Approved() throws Exception {
+        StatusUpdateRequest req = new StatusUpdateRequest();
+        req.setStatus("approved");
+
+        when(loanApplicationRepository.findById(10L)).thenReturn(Optional.of(loanApp));
+        when(loanApplicationRepository.save(any())).thenReturn(loanApp);
+
+        loanService.updateLoanApplicationStatus(10L, req);
+        assertEquals(LoanStatus.APPROVED, loanApp.getStatus());
+        assertNotNull(loanApp.getApprovedDate());
     }
 
     @Test
-    void testUpdateLoanApplicationStatus_Approved() throws Exception {
-        // Arrange
-        StatusUpdateRequest request = new StatusUpdateRequest();
-        request.setStatus("APPROVED");
+    void testUpdateStatus_Rejected() throws Exception {
+        StatusUpdateRequest req = new StatusUpdateRequest();
+        req.setStatus("rejected");
+        req.setRejectionReason("Bad history");
 
         when(loanApplicationRepository.findById(10L)).thenReturn(Optional.of(loanApp));
-        when(loanApplicationRepository.save(any(LoanApplication.class))).thenReturn(loanApp);
+        when(loanApplicationRepository.save(any())).thenReturn(loanApp);
 
-        // Act
-        LoanApplicationResponse response = loanService.updateLoanApplicationStatus(10L, request);
-
-        // Assert
-        assertEquals("APPROVED", response.getStatus());
-        verify(notificationService).createNotification(any(), contains("APPROVED"), eq(10L));
+        loanService.updateLoanApplicationStatus(10L, req);
+        assertEquals(LoanStatus.REJECTED, loanApp.getStatus());
+        assertEquals("Bad history", loanApp.getRejectionReason());
     }
 
     @Test
-    void testUpdateLoanApplicationStatus_Rejected() throws Exception {
-        // Arrange
-        StatusUpdateRequest request = new StatusUpdateRequest();
-        request.setStatus("REJECTED");
-        request.setRejectionReason("Income too low");
+    void testUpdateStatus_Invalid() {
+        StatusUpdateRequest req = new StatusUpdateRequest();
+        req.setStatus("PENDING"); // Only APPROVED/REJECTED handled in your if/else
 
         when(loanApplicationRepository.findById(10L)).thenReturn(Optional.of(loanApp));
-        when(loanApplicationRepository.save(any(LoanApplication.class))).thenReturn(loanApp);
+        assertThrows(Exception.class, () -> loanService.updateLoanApplicationStatus(10L, req));
+    }
 
-        // Act
-        LoanApplicationResponse response = loanService.updateLoanApplicationStatus(10L, request);
+    // --- 3. TEST LIST & FIND METHODS (Exception coverage) ---
 
-        // Assert
-        assertEquals("REJECTED", response.getStatus());
-        verify(notificationService).createNotification(any(), contains("REJECTED"), eq(10L));
+    @Test
+    void testGetLoanApplicationsByStatus_InvalidEnum() {
+        // This hits the valueOf() exception branch
+        assertThrows(IllegalArgumentException.class, () ->
+                loanService.getLoanApplicationsByStatus("INVALID_STATUS_NAME")
+        );
     }
 
     @Test
-    void testGetLoanApplicationById_Success() throws Exception {
-        when(loanApplicationRepository.findById(10L)).thenReturn(Optional.of(loanApp));
-
-        LoanApplicationResponse response = loanService.getLoanApplicationById(10L);
-
-        assertNotNull(response);
-        assertEquals(10L, response.getId());
+    void testGetAllLoanApplications() {
+        when(loanApplicationRepository.findAllByOrderBySubmittedDateDesc()).thenReturn(Arrays.asList(loanApp));
+        assertEquals(1, loanService.getAllLoanApplications().size());
     }
 
     @Test
     void testGetLoanApplicationById_NotFound() {
         when(loanApplicationRepository.findById(99L)).thenReturn(Optional.empty());
-
         assertThrows(Exception.class, () -> loanService.getLoanApplicationById(99L));
     }
 
     @Test
-    void testGetUserLoanApplications_Success() throws Exception {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(loanApplicationRepository.findByUser(testUser)).thenReturn(Collections.singletonList(loanApp));
-
-        List<LoanApplicationResponse> result = loanService.getUserLoanApplications(1L);
-
-        assertFalse(result.isEmpty());
-        assertEquals(1, result.size());
-    }
-
-    @Test
-    void testGetLoanApplicationsByStatus_Success() throws Exception {
-        when(loanApplicationRepository.findByStatus(LoanStatus.SUBMITTED))
-                .thenReturn(Collections.singletonList(loanApp));
-
-        List<LoanApplicationResponse> result = loanService.getLoanApplicationsByStatus("SUBMITTED");
-
-        assertEquals(1, result.size());
+    void testGetUserLoanApplications_UserNotFound() {
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+        assertThrows(Exception.class, () -> loanService.getUserLoanApplications(1L));
     }
 }

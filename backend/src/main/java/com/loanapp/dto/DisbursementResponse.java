@@ -12,6 +12,9 @@ public class DisbursementResponse {
     private String disbursedByAdmin;
     private String remarks;
 
+    public DisbursementResponse() {
+    }
+
     public DisbursementResponse(Long id, Long loanApplicationId, String transactionReference, LocalDateTime requestedDate, LocalDateTime approvedDate, LocalDateTime disbursedDate, String disbursedByAdmin, String remarks) {
         this.id = id;
         this.loanApplicationId = loanApplicationId;

@@ -9,6 +9,9 @@ public class AdminActionLog {
     private String action;
     private LocalDateTime timestamp;
 
+    public AdminActionLog() {
+    }
+
     public AdminActionLog(Long loanApplicationId, String userFullName, String adminUsername, String action, LocalDateTime timestamp) {
         this.loanApplicationId = loanApplicationId;
         this.userFullName = userFullName;
